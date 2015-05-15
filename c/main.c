@@ -2,8 +2,9 @@
 #include <stdlib.h>
 
 //TODO:
-//make function that takes filepointer and returns struct.
-//struct: length,
+//validate input
+//check if input token grows the string and grow it
+//check if container grows stack or harbor and grow them
 
 //should be unsigned 32bit int
 typedef unsigned long int uint;
@@ -182,6 +183,8 @@ struct stackvec_t* init() {
 
 void addtostack(uint container, struct stackvec_t* pHarbor) {
 
+	uint max = 0 - 1;
+
 	for (uint itHarbor = 0; itHarbor != pHarbor->last; itHarbor++) {
 
 		//TODO
@@ -199,12 +202,34 @@ void addtostack(uint container, struct stackvec_t* pHarbor) {
 
 }
 
+char* grow(chararray) {
+
+	const int newsize = sizeof(chararray) * 1.2;
+
+	char* newchararray[] = malloc( newsize );
+
+	strcpy(newchararray, chararray);
+
+	return newchararray;
+
+}
+
+void strappend(char c, char* chararray[]) {
+
+	if (strlen(chararray) == sizeof(chararray) / sizeof(char) - 1) {
+		chararray = grow(chararray);
+	}
+
+	//put at the end of str. test these fuckers! as in do unit_test.c that exercises all these functions
+
+}
+
 int main(int argc, char **argv)
 {
 	FILE *pInfile;
 	FILE *pOutfile;
 
-	char ch, file_name[255];
+	char file_name = argv[1];
 
 	pInfile = fopen(file_name, "r");
 	pOutfile = fopen("out.data", "w");
@@ -217,6 +242,7 @@ int main(int argc, char **argv)
 	struct stackvec_t* pHarbor = initstack();
 
 	char c;
+	char* token[] = malloc( sizeof( char ) * 20 ) ;
 	while (	c = getc(pInfile) != EOF) {
 
 		switch (c)
@@ -228,11 +254,21 @@ int main(int argc, char **argv)
 			break;
 		case '\r':
 			break;
+		case ',':
+			strappend( c, token );
+			break;
 		default:
-			addtostack(c, pHarbor);
+			addtostack(token, pHarbor);
 			break;
 		}
 	}
+
+
+	//cleanup
+	free(token);
+	fclose( pInfile);
+	fclose( pOutfile);
+	freestack(pHarbor);
 
 	return 0;
 }
