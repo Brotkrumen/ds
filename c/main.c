@@ -317,7 +317,18 @@ void addtostack(uint newContainer, harbor_t** ptr_pHarbor) {
 	}
 }
 
-char* readfiletobuffer(char* file_name) {
+
+/******************************************************************************
+* Description	source: cpp reference for fread
+*				points given char* to place in mem where fileconts was put
+*
+* param			address of pointer to be repointed
+*				char * to filename
+*
+* returns		length of the filebuffer
+*
+/******************************************************************************/
+uint readfiletobuffer( char ** ptr_buffer, char* file_name ) {
 
 	FILE * pFile;
 	long lSize;
@@ -333,8 +344,8 @@ char* readfiletobuffer(char* file_name) {
 	rewind(pFile);
 
 	// allocate memory to contain the whole file:
-	// +1 to allocate the \0
-	buffer = (char*)malloc((sizeof(char)*lSize)+1);
+	// +1 to allocate the last \n at
+	buffer = (char*)malloc((sizeof(char)*lSize));
 	if (buffer == NULL) { fputs("Memory error", stderr); exit(2); }
 
 	// copy the file into the buffer:
@@ -343,12 +354,12 @@ char* readfiletobuffer(char* file_name) {
 
 	/* the whole file is now loaded in the memory buffer. */
 
-	//fread doesn't 0 terminate
-	buffer[result - 1] = '\0';
-
 	// terminate
 	fclose(pFile);
-	return buffer;
+	
+	*ptr_buffer = buffer;
+
+	return result;
 }
 
 void appendtofile( harbor_t* pHarbor, char* path) {
@@ -401,52 +412,58 @@ int main(int argc, char **argv)
 		file_name = "C:/workspace/ds/harborProblem/testdata/input1.data";
 	}
 
-	char* filebuffer = readfiletobuffer(file_name);
 
+	char* filebuffer; 
+	
+	//points the given char* at contents of file read
+	uint bufferlen = readfiletobuffer( &filebuffer, file_name);
+
+	char* endOfBuff = filebuffer + bufferlen * sizeof(char) - 1;	//pos of last valid byte
 	char* pline = strchr(filebuffer, '\n');
 	char* pEnd;
-	char* pinbuff = filebuffer;
+	char* pinbuff = filebuffer;										//moving pointer to where
+																	//we are reading currently
 	uint thisnum;
-	int EOFflag = 0;
-	harbor_t* pHarbor = initHarbor( INITIAL_HARBOR_SIZE );
+	harbor_t* pHarbor;
 
-	clearfile("out.data");
+	//clearfile("out.data");
 
 	while ( pline != NULL )
 	{
+		pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
 
 		//-1 to compensate the +1 later. easiest way to give pEnd a good start val
 		pEnd = pinbuff - 1;
 		while (pEnd != pline) {
 
-			//put number on stack
+			//reads number as long int, pEnd ends up at one past valid (aka ,)
 			thisnum = strtoul(pEnd + 1, &pEnd, 10);
 
+			//put number on stack
 			addtostack(thisnum, &pHarbor);
 		}
 
 		//line has been found. prepare for new line
 		//and write result to outfile
-		//printstack(pHarbor);
-		appendtofile(pHarbor, "out.data");
+		printstack(pHarbor);
+		//appendtofile(pHarbor, "out.data");
 		freeHarbor(pHarbor);
-		pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
+
+		if (pEnd == endOfBuff) {
+			break;
+		}
 
 		pinbuff = pline + 1;
 		pline = strchr(pline + 1, '\n');
 
-		if (pline == 0 && EOFflag == 1) {
-			break;
-		}
-
+		//pline gets position of \n. at end of file there is no \n
+		//so set pline to last valid position of filebuffer
 		if (pline == 0) {
-			EOFflag = 1;
-			pline = strchr(pinbuff + 1, '\0');
+			pline = filebuffer + bufferlen * sizeof(char) ;
 		}
 	}
 
 	//cleanup
-	freeHarbor(pHarbor);
 	free(filebuffer);
 	return 0;
 }
