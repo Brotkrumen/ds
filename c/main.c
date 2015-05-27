@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 //TODO:
 //validate input
@@ -72,7 +73,7 @@ void freestack(containerStack_t* pStack) {
 }
 
 /******************************************************************************
-* Description	grows the size of a containerstack by 1.2
+* Description	grows the size of a containerstack by GROWTH_FACTOR
 *				copies values, not ptrs, to the new stack.
 *				old stack gets freed
 *
@@ -156,7 +157,7 @@ void growHarbor(harbor_t ** ptr_pHarbor) {
 
 	harbor_t* pHarbor = *ptr_pHarbor;
 
-	harbor_t* newHarbor = initHarbor((int)pHarbor->length * GROWTH_FACTOR);
+	harbor_t* newHarbor = initHarbor((int)(pHarbor->length * GROWTH_FACTOR));
 
 	for (uint i = 0; i <= pHarbor->last; i++) {
 		newHarbor->array[i] = pHarbor->array[i];
@@ -363,6 +364,11 @@ uint readfiletobuffer( char ** ptr_buffer, char* file_name ) {
 }
 
 void appendtofile( harbor_t* pHarbor, char* path) {
+
+	if (pHarbor->isEmpty == 1) {
+		return;
+	}
+
 	FILE *pOutfile = fopen( path , "a");
 	if (pOutfile == NULL) 	{
 		printf("Error opening file!\n");
@@ -404,62 +410,113 @@ void clearfile( char* path ) {
 	fclose(pOutfile);
 }
 
+/******************************************************************************
+* Description Validates input file data
+*
+* param		char* to filecontents
+			int length of buffer
+*
+* return TODO
+/******************************************************************************/
+
+void validateInput(char* filebuffer, int bufferlen) {
+
+	int linecounter = 1;
+	int poscounter = 0;
+	int founderror = 0;
+	int requireDigit = 0;
+	char* endOfBuffer = filebuffer + bufferlen * sizeof(char) - 1;	//pos of one past last valid cahr
+
+	//endOfBuf - (int)filebuffer should be the length of the filebuffer
+	for (int i = 0; i <= endOfBuffer - filebuffer; i++) {
+		
+		if (filebuffer[i] != '\n') {
+			poscounter++;
+		}
+		else {
+			poscounter = 0;
+			linecounter++;
+		}
+
+		if ( (!isdigit(filebuffer[i]) && filebuffer[i] != ',' && filebuffer[i] != '\n' )
+			|| (!isdigit(filebuffer[i]) && requireDigit )) {
+
+			if (filebuffer[i] == '\n') {
+				printf("char '\\n' with val %i in line %i at pos %i is not a valid input.\n",
+					(int)filebuffer[i], linecounter, poscounter);
+			} else {
+				printf("char '%c' with val %i in line %i at pos %i is not a valid input.\n",
+					filebuffer[i], (int)filebuffer[i], linecounter, poscounter);
+			}
+			
+			founderror = 1;
+		}
+
+		//to get the ",\n" case
+		if (filebuffer[i] == ',') {
+			requireDigit = 1;
+		} else {
+			requireDigit = 0;
+		}
+	}
+
+	if (founderror) {
+		printf("\n%s\n", "only \\n separated lines with comma separated positive integers allowed");
+		exit(1);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	char* file_name = argv[1];
 
 	if (file_name == NULL) {
-		file_name = "C:/workspace/ds/harborProblem/testdata/input1.data";
+		file_name = "C:/workspace/ds/harborProblem/testdata/input3.data";
 	}
-
 
 	char* filebuffer; 
 	
 	//points the given char* at contents of file read
 	uint bufferlen = readfiletobuffer( &filebuffer, file_name);
 
-	char* endOfBuff = filebuffer + bufferlen * sizeof(char) - 1;	//pos of last valid byte
-	char* pline = strchr(filebuffer, '\n');
+	char* endOfBuff = filebuffer + bufferlen * sizeof(char) - 1;	//pos of one past last valid cahr
 	char* pEnd;
-	char* pinbuff = filebuffer;										//moving pointer to where
-																	//we are reading currently
+
+	validateInput(filebuffer, bufferlen);
+
 	uint thisnum;
 	harbor_t* pHarbor;
 
 	//clearfile("out.data");
 
-	while ( pline != NULL )
-	{
-		pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
+	pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
 
-		//-1 to compensate the +1 later. easiest way to give pEnd a good start val
-		pEnd = pinbuff - 1;
-		while (pEnd != pline) {
+	//-1 compensate for strtoul +1
+	pEnd = filebuffer -1 ;
+	while (1) {
 
-			//reads number as long int, pEnd ends up at one past valid (aka ,)
-			thisnum = strtoul(pEnd + 1, &pEnd, 10);
+		thisnum = strtoul(pEnd + 1, &pEnd, 10);
 
-			//put number on stack
-			addtostack(thisnum, &pHarbor);
+		//48 is ascii 0. check to distinguish between (null) value return
+		if (thisnum == 0 && (*(pEnd - 1) != 48 )) {
+			printf("%s\n%i\n", "couldnt read number before eof encountered. exit", *(pEnd-1) );
+			exit(-1);
 		}
 
-		//line has been found. prepare for new line
-		//and write result to outfile
-		printstack(pHarbor);
-		//appendtofile(pHarbor, "out.data");
-		freeHarbor(pHarbor);
+		addtostack(thisnum, &pHarbor);
+
+		if (*pEnd == '\n') {
+			printstack(pHarbor);
+			appendtofile(pHarbor, "out.data");
+			freeHarbor(pHarbor);
+			pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
+		}
 
 		if (pEnd == endOfBuff) {
+			printstack(pHarbor);
+			appendtofile(pHarbor, "out.data");
+			freeHarbor(pHarbor);
 			break;
-		}
-
-		pinbuff = pline + 1;
-		pline = strchr(pline + 1, '\n');
-
-		//pline gets position of \n. at end of file there is no \n
-		//so set pline to last valid position of filebuffer
-		if (pline == 0) {
-			pline = filebuffer + bufferlen * sizeof(char) ;
 		}
 	}
 
