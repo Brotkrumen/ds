@@ -3,9 +3,6 @@
 #include <string.h>
 #include <ctype.h>
 
-//TODO:
-//validate input
-
 //should be unsigned 32bit int
 typedef unsigned long int uint;
 
@@ -22,7 +19,7 @@ const double GROWTH_FACTOR = 1.2;
 *	array*		pointer to first element
 *				holds uint values
 *
-/******************************************************************************/
+******************************************************************************/
 
 typedef struct stack_t {
 	uint length;
@@ -38,7 +35,7 @@ typedef struct stack_t {
 *
 * Returns		pointer to stack created
 *
-/******************************************************************************/
+******************************************************************************/
 
 containerStack_t* initContainerstack(uint maxlen) {
 	//ptr to stack
@@ -63,7 +60,7 @@ containerStack_t* initContainerstack(uint maxlen) {
 *
 * param			pointer to stack
 *
-/******************************************************************************/
+******************************************************************************/
 
 void freestack(containerStack_t* pStack) {
 
@@ -79,7 +76,7 @@ void freestack(containerStack_t* pStack) {
 *
 * param			takes address of a pointer to be changed
 *
-/******************************************************************************/
+******************************************************************************/
 
 void growStack(containerStack_t ** ptr_pStack) {
 
@@ -110,7 +107,7 @@ void growStack(containerStack_t ** ptr_pStack) {
 *	array*		pointer to first element
 *				holds containerStack_t pointers
 *
-/******************************************************************************/
+******************************************************************************/
 
 typedef struct stackvec_t {
 	uint length;
@@ -129,7 +126,7 @@ typedef struct stackvec_t {
 *
 * returns		pointer to harbor_t
 *
-/******************************************************************************/
+******************************************************************************/
 
 harbor_t* initHarbor( uint maxlen ) {
 
@@ -151,7 +148,7 @@ harbor_t* initHarbor( uint maxlen ) {
 *
 * param			pointer to Harbor
 *
-/******************************************************************************/
+******************************************************************************/
 
 void growHarbor(harbor_t ** ptr_pHarbor) {
 
@@ -181,7 +178,7 @@ void growHarbor(harbor_t ** ptr_pHarbor) {
 *
 * param			pointer to "harbor"
 *
-/******************************************************************************/
+******************************************************************************/
 
 void printstack( harbor_t* pHarbor) {
 
@@ -217,7 +214,7 @@ void printstack( harbor_t* pHarbor) {
 *
 * param			pointer to "harbor"
 *
-/******************************************************************************/
+******************************************************************************/
 
 void freeHarbor(harbor_t* pHarbour) {
 
@@ -253,7 +250,7 @@ void freeHarbor(harbor_t* pHarbour) {
 *
 * returns		pointer to harbor_t
 *
-/******************************************************************************/
+******************************************************************************/
 
 void addtostack(uint newContainer, harbor_t** ptr_pHarbor) {
 
@@ -328,7 +325,7 @@ void addtostack(uint newContainer, harbor_t** ptr_pHarbor) {
 *
 * returns		length of the filebuffer
 *
-/******************************************************************************/
+******************************************************************************/
 uint readfiletobuffer( char ** ptr_buffer, char* file_name ) {
 
 	FILE * pFile;
@@ -416,8 +413,7 @@ void clearfile( char* path ) {
 * param		char* to filecontents
 			int length of buffer
 *
-* return TODO
-/******************************************************************************/
+******************************************************************************/
 
 void validateInput(char* filebuffer, int bufferlen) {
 
@@ -476,10 +472,10 @@ int main(int argc, char **argv)
 
 	char* filebuffer; 
 	
-	//points the given char* at contents of file read
+	//points the in char* at contents of file read
 	uint bufferlen = readfiletobuffer( &filebuffer, file_name);
-
-	char* endOfBuff = filebuffer + bufferlen * sizeof(char) - 1;	//pos of one past last valid cahr
+	
+	char* endOfBuff = filebuffer + bufferlen * sizeof(char);
 	char* pEnd;
 
 	validateInput(filebuffer, bufferlen);
@@ -487,7 +483,7 @@ int main(int argc, char **argv)
 	uint thisnum;
 	harbor_t* pHarbor;
 
-	//clearfile("out.data");
+	clearfile("out.data");
 
 	pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
 
@@ -498,8 +494,11 @@ int main(int argc, char **argv)
 		thisnum = strtoul(pEnd + 1, &pEnd, 10);
 
 		//48 is ascii 0. check to distinguish between (null) value return
+		//since value 0 is in the input data
 		if (thisnum == 0 && (*(pEnd - 1) != 48 )) {
-			printf("%s\n%i\n", "couldnt read number before eof encountered. exit", *(pEnd-1) );
+			printf("%s\nnumber:%i pEnd addr%i endOfBuff addr: %i\n"
+			, "couldnt read number before eof encountered. exit"
+			, *(pEnd-1), pEnd, endOfBuff );
 			exit(-1);
 		}
 
@@ -511,8 +510,9 @@ int main(int argc, char **argv)
 			freeHarbor(pHarbor);
 			pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
 		}
-
-		if (pEnd == endOfBuff) {
+		
+		//last char in input data is always linebreak. dont wanna rely on that
+		if (pEnd == endOfBuff-1 || pEnd == endOfBuff) {
 			printstack(pHarbor);
 			appendtofile(pHarbor, "out.data");
 			freeHarbor(pHarbor);
