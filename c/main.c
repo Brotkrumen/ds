@@ -40,10 +40,12 @@ typedef struct stack_t {
 containerStack_t* initContainerstack(uint maxlen) {
 	//ptr to stack
 	containerStack_t* pStack = (containerStack_t*)malloc(sizeof(containerStack_t));
+	if (pStack == NULL) { fputs("Memory error", stderr); exit(2); }
 
 	//set array of container length and allocate mem
 	pStack->length = maxlen;
 	uint* array = (uint*)malloc(sizeof(uint) *pStack->length);
+	if (array == NULL) { fputs("Memory error", stderr); exit(2); }
 
 	//assign pointer of the array to the stack
 	pStack->array = array;
@@ -137,6 +139,7 @@ harbor_t* initHarbor( uint maxlen ) {
 	pHarbor->isEmpty = 1;
 	pHarbor->length = maxlen;
 	pHarbor->array = (containerStack_t**)malloc(sizeof(containerStack_t*) * pHarbor->length);
+	if (pHarbor->array == NULL) { fputs("Memory error", stderr); exit(2); }
 
 	return pHarbor;
 }
@@ -467,7 +470,9 @@ int main(int argc, char **argv)
 	char* file_name = argv[1];
 
 	if (file_name == NULL) {
-		file_name = "C:/workspace/ds/harborProblem/testdata/input3.data";
+		printf("No file specified. Usage: main /path/to/file");
+		exit(-1);		
+		//file_name = "C:/workspace/ds/harborProblem/testdata/input3.data";
 	}
 
 	char* filebuffer; 
@@ -483,7 +488,7 @@ int main(int argc, char **argv)
 	uint thisnum;
 	harbor_t* pHarbor;
 
-	clearfile("out.data");
+	//clearfile("out.data");
 
 	pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
 
@@ -506,7 +511,7 @@ int main(int argc, char **argv)
 
 		if (*pEnd == '\n') {
 			printstack(pHarbor);
-			appendtofile(pHarbor, "out.data");
+			//appendtofile(pHarbor, "out.data");
 			freeHarbor(pHarbor);
 			pHarbor = initHarbor(INITIAL_HARBOR_SIZE);
 		}
@@ -514,7 +519,7 @@ int main(int argc, char **argv)
 		//last char in input data is always linebreak. dont wanna rely on that
 		if (pEnd == endOfBuff-1 || pEnd == endOfBuff) {
 			printstack(pHarbor);
-			appendtofile(pHarbor, "out.data");
+			//appendtofile(pHarbor, "out.data");
 			freeHarbor(pHarbor);
 			break;
 		}
