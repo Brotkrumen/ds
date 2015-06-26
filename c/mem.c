@@ -8,12 +8,14 @@
 typedef unsigned long ulong;
 
 static ulong memorysize = 0;
-static void* memstart;
-static void* memend;
+static void* pmemstart;
+static void* pmemend;
 static ulong* pfree;
 static ulong* pnext;
 static ulong* plast;
 static ulong* psectionsize;
+
+#define HEADER_SIZE 3;
 
 /*
     Memory layout:
@@ -22,10 +24,18 @@ static ulong* psectionsize;
     at pfree + 2    :   length of current section
 */
 
-void movepointers() {
-    plast = (ulong*)*pfree;
-    pnext = (ulong*)*(pfree+8);
-    psectionsize = (ulong*)*(pfree+16);
+void llnext() {
+    plast = pfree;
+    pfree = (ulong*)*pnext;
+    pnext = (ulong*)*(pfree+1);
+    psectionsize = (ulong*)*(pfree+2);
+}
+
+void addsize( ulong** pnew, ulong size ) {
+
+    char* tmp = (char*)*pnew;
+    tmp += size;
+    *pnew = (ulong*)tmp;
 }
 
 /*
@@ -39,10 +49,16 @@ void movepointers() {
         mem insufficient
 */
 
-void* stalloc( size_t size ) {
+void* stalloc( size_t insize ) {
+
+    ulong size = (ulong)insize;
+
+    printf( "requesting %i bytes\n", (int)size );
 
     //case 1
     if( memorysize == 0 ) {
+
+        printf("first call to stalloc. getting mem\n");
 
         int togrow = 1024;
 
@@ -50,45 +66,61 @@ void* stalloc( size_t size ) {
             togrow *= 1.2;
         }
 
+        memorysize = togrow;
+
         //setting all pointers to program endpoint, which should be the
         //the start of the data section 
-        pfree = plast = pnext = memstart = sbrk(0);
+        pfree = plast = pmemstart = sbrk( togrow );
 
-        memend = sbrk( togrow );
+        //(ulong*)+1 moves ptr by sizeof(ulong*)*1 = 8 bytes
+        pnext = pfree+1;
+        psectionsize = pfree+2;
 
-        psectionsize = (ulong*)pfree+16;
-
-        printf("%i %i\n", pfree, plast );
+        pmemend = pmemstart + togrow;
 
         //set value in first header section "last"
         //pfree as we have no mapped mem yet
-        *plast = (ulong)&pfree;
+        *plast = (ulong)pfree;
 
         //set value in second header section "next"
-        *pnext = (ulong)&pfree+8;
+        *pnext = (ulong)pfree;
 
         //set value in third header section "sectionsize"
-        *psectionsize = togrow;        
+        *psectionsize = togrow - 24;
+        printf("--------------------- inital block size --------------------\n");
+        printf( "    start  |   togrow   |       end\n%10i | %10i | %10i\n"
+                ,(int)pfree, togrow, (int)pmemend ); 
+        printf("------------------------------------------------------------\n\n");      
     }
 
     /*
     case 2: section size is sufficient 
             should probably happen after searching through the linked
-            list and finding a section.
+            list and finding a sectinverseion.
             set pfound to the current pointer
             pfree moves sizeof(header) + size to allocate forward in section
             pointers are set to the header positions
             and header data is written
     */
     
-    ulong* pstart = plast;
+    //set pstart to last element in linked list to see
+    //when we ran a round
+    ulong* pstart = (ulong*)*plast;
 
     //search linked list until fitting section is found
     //or we are at the start again
+    printf("--------------------- looping through ll--------------------\n");
+    printf("    pstart |     pfree  |sectionsize |       size |fits |isBeg\n" 
+           "%10i | %10i | %10i | %10i | %3i | %3i\n"
+            , (int)pstart,(int)pfree,(int)*psectionsize,(int)size
+            , (int)( *psectionsize < size ), (int)(pstart != pfree));
     while( pstart != pfree && *psectionsize < size ) {
-        pfree = ( ulong* )*(pfree+8);
-        movepointers();
+        printf("%10i | %10i | %10i | %10i | %3i | %3i\n"
+                , (int)pstart,(int)pfree,(int)*psectionsize,(int)size
+                , (int)( *psectionsize < size ), (int)(pstart != pfree));
+        llnext();
     }
+    printf("------------------------------------------------------------\n\n");
 
     ulong* pfound = NULL;
 
@@ -96,34 +128,81 @@ void* stalloc( size_t size ) {
     if( *psectionsize >= size ) {
         pfound = pfree;
 
-        pfree = pfree + 24 + size;
-        movepointers();
+        //move ptr by metadata size
 
-        *plast = (ulong)&pfound;
-        *pnext = (ulong)&pfound+8;
-        *psectionsize = *(pfound+16) - size - 24;
+        ulong* pnewfree = pfree + HEADER_SIZE;
+        addsize( &pnewfree, size );
+
+        printf("--------------------- found section case -------------------\n");
+        printf("    pfound |      size  | size found |     pmoved\n"
+                "%10i | %10i | %10i | %10i\n"
+                ,(int)pfound, (int)size, (int)*psectionsize, (int)pnewfree );
+        printf("------------------------------------------------------------\n\n");
+
+        //if pfree == plast, only one element in free linked list
+        //need to bind new plast pnext to the same new element
+        if( pfree != plast ) {
+            *pnewfree = (ulong)plast;
+            *(pnewfree+1) = (ulong)pnext;
+        } else {
+            *pnewfree = (ulong)pnewfree;
+            *(pnewfree+1) = (ulong)pnewfree;
+        }
+        
+        *(pnewfree+2) = *psectionsize - 24 - size;
+
+        pfree = pnewfree;
+        plast = (ulong*)*pfree;
+        pnext = (ulong*)*(pfree+1);
+        psectionsize = (ulong*)*pfree+2;
+
+        printf("  pfreenew |    plast  |     pnext  | sectionsize\n"
+                "%10i | %10i | %10i | %10i\n"
+                , (int)pfree, (int)plast, (int)pnext, (int)*psectionsize );
+        printf("------------------------------------------------------------\n\n");
     }
 
     //no pfound set means we need to get more memory
     if( pfound == NULL ) {
-        pfound = memend+1;
+        printf("--------------------- no fit found -----------------------\n");
+        printf("--------------------- need more memory--------------------\n");
+        printf("    memorysize |     reqested  \n" 
+           "%10i | %10i\n", (int)memorysize, (int)size);
+        printf("------------------------------------------------------------\n\n");
 
-        int togrow = 0;
+        pfound = pmemend;
 
-        while( size + 24 > togrow ) {
-            togrow *= memorysize * 1.2 - memorysize;
+        int togrow = memorysize * 1.2;
+
+        if( size + 24 > togrow ) {
+            togrow = size*1.2;
         }
 
-        memend = sbrk( togrow );
+        memorysize += togrow;
 
-        ulong* ptemp = pfree;
+        printf("    togrow | new memsize  \n" 
+                "%10i | %10i\n", (int)togrow, (int)memorysize);
 
-        pfree = pfound + 24 + size;
-        movepointers();
+        sbrk( togrow );
+        pmemend += togrow;
 
-        *plast = (ulong)&ptemp;
-        *pnext = (ulong)&memstart;
-        *psectionsize = (ulong)memend - size;
+        ulong* pnewfree = pfound;
+
+        pnewfree += 3;
+        addsize( &pnewfree, size );
+
+
+        //TODO reserve function to avoid code doubling
+        
+        *pnewfree = (ulong)pfree;
+        *(pnewfree+1) = *pnext;
+        *(pnewfree+2) = *psectionsize - 24 - size;
+        *pnext = (ulong)pnewfree;
+
+        pfree = pnewfree;
+        plast = (ulong*)*pfree;
+        pnext = (ulong*)*(pfree+1);
+        psectionsize = (ulong*)*pfree+2;
     }
 
     return pfound;
@@ -132,5 +211,6 @@ void* stalloc( size_t size ) {
 int main(int argc, char const *argv[])
 {
     stalloc( 30 );
+    stalloc( 2394 );
     return 0;
 }
