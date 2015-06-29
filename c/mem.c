@@ -28,8 +28,8 @@ static ulong* psectionsize;
 
 void nextnode() {
     pfree = plast = (ulong*)*pnext;
-    pnext = &*pfree+1;
-    psectionsize = (ulong*)*(pfree+2);
+    pnext = pfree+1;
+    psectionsize = (ulong*)pfree+2;
 }
 
 void insertNode( ulong* pnewNode, ulong togrow ) {
@@ -104,7 +104,7 @@ void* stalloc( size_t insize ) {
 
         //setting all pointers to program endpoint, which should be the
         //the start of the data section 
-        pfree = plast = pmemstart = sbrk( togrow );
+        pfree = plast = pmemstart = (ulong*)sbrk( togrow );
 
         if( (int)pfree == -1) {
             fprintf( stderr, "sbrk failed");
@@ -254,11 +254,6 @@ void* stalloc( size_t insize ) {
 
 int main(int argc, char const *argv[])
 {
-
-    printf("%i\n", (int)sizeof(ulong) );
-    printf("%i\n", (int)sizeof(ulong*) );
-
-
     char* testchar = stalloc( 30 );
     testchar = "01234567890123456789012345678";
     printf("%s\n", testchar );
@@ -269,8 +264,8 @@ int main(int argc, char const *argv[])
         testnums[i] = i;
     }
 
-    for( ulong i = 0; i<100; i++ ) {
-        printf("%i\n", (int)testnums[i] );
+    for( ulong i = 0; i<200; i++ ) {
+        printf("%i", (int)testnums[i] );
     }
 
     return 0;
