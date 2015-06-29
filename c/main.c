@@ -134,6 +134,7 @@ harbor_t* initHarbor( uint maxlen ) {
 
 	//ptr to a harbor struct
 	harbor_t* pHarbor = (harbor_t *)malloc(sizeof(harbor_t));
+	if (pHarbor == NULL) { fputs("Memory error", stderr); exit(2); }
 
 	pHarbor->last = 0;
 	pHarbor->isEmpty = 1;
